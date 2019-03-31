@@ -12,7 +12,7 @@ public:
     void GetNextVertices(int, vector<int>&) const;
     void GetPrevVertices(int, vector<int>&) const;
 private:
-    vector<vector<bool>> adjacencyMatrix; // матрица смежности
+    vector<vector<bool>> adjacencyMatrix;
 };
 
 #endif //INC_1_MATRIXGRAPH_H

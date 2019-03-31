@@ -3,6 +3,7 @@
 
 #include "IGraph.h"
 #include <unordered_set>
+using std::unordered_set;
 
 class SetGraph : public IGraph {
 public:
@@ -13,8 +14,7 @@ public:
     void GetNextVertices(int vertex, std::vector<int>& vertices) const;
     void GetPrevVertices(int vertex, std::vector<int>& vertices) const;
 private:
-    vector<std::unordered_set<int>> graph;
-    //std::vector< std::vector<int> > graph;
+    vector<unordered_set<int>> table;
 };
 
 #endif //INC_1_SETGRAPH_H

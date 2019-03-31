@@ -6,7 +6,7 @@ MatrixGraph::MatrixGraph(const IGraph* graph) : MatrixGraph(graph->VerticesCount
     for (int i = 0; i < graph->VerticesCount(); ++i) {
         vector <int> next;
         graph->GetNextVertices(i, next);
-        for (int j = 0; j < next.size; ++j) {
+        for (int j = 0; j < next.size(); ++j) {
             AddEdge(i, next[j]);
         }
     }

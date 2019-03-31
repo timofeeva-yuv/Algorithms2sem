@@ -12,7 +12,7 @@ public:
     void GetNextVertices(int, vector<int>&) const;
     void GetPrevVertices(int, vector<int>&) const;
 private:
-    vector<vector<int>> adjacencyList; // список смежности
+    vector<vector<int>> adjacencyList;
 };
 
 
