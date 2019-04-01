@@ -1,3 +1,0 @@
-/home/jaguar/CLionProjects/2 семак/1 контест/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/home/jaguar/CLionProjects/2 семак/1 контест/cmake-build-debug/CMakeFiles/edit_cache.dir
-/home/jaguar/CLionProjects/2 семак/1 контест/cmake-build-debug/CMakeFiles/1_.dir
