@@ -74,7 +74,7 @@ int Bfs(IGraph* graph, int start) {
         tops.pop();
         vector<int> next_vertices;
         graph->GetNextVertices(vertex, next_vertices);
-        for (int i = 0; i < next_vertices.size(); i++) {
+        for (int i = 0; i < next_vertices.size(); ++i) {
             if (color[next_vertices[i]] == 0) {
                 tops.push(next_vertices[i]);
                 cycle[next_vertices[i]] = cycle[vertex] + 1;
@@ -82,9 +82,6 @@ int Bfs(IGraph* graph, int start) {
             }
             else if (color[next_vertices[i]] == 1) {
                 length_cycle = cycle[vertex] + cycle[next_vertices[i]] + 1;
-            }
-            else if (color[next_vertices[i]] == 2 && next_vertices[i] == vertex) {
-                length_cycle = 1;
             }
         }
         color[vertex] = 2;
