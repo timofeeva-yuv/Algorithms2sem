@@ -1,130 +1,111 @@
-#include <algorithm>
 #include <iostream>
+#include <queue>
 #include <vector>
+using std::queue;
+using std::vector;
 using std::cin;
 using std::cout;
-using std::vector;
-using std::max;
 
-struct Graph {
-    Graph(int vNumber) :
-            vertexNumber(vNumber),
-            list(vertexNumber),
-            reversed_list(vertexNumber),
-            vertex_in_component(vertexNumber, 0),
-            visited(vertexNumber, false),
-            visited_reverse(vertexNumber, false)
-    {}
-    int vertexNumber;
-    vector<vector<int>> list;
-    vector<int> vertex_in_component;
-    vector<vector<int>> reversed_list;
-    vector<bool > visited;
-    vector<bool> visited_reverse;
+struct IGraph {
+    virtual ~IGraph() {}
+    virtual void AddEdge(int from, int to) = 0;
+    virtual int VerticesCount() const = 0;
+    virtual void GetNextVertices(int vertex, std::vector<int>& vertices) const = 0;
+    virtual void GetPrevVertices(int vertex, std::vector<int>& vertices) const = 0;
 };
 
-void DFS(int v, Graph& graph, vector<int>& leave) {
-    graph.visited[v] = true;
-    for (size_t i = 0; i < graph.list[v].size(); ++i) {
-        if (!graph.visited[graph.list[v][i]]) {
-            DFS(graph.list[v][i], graph, leave);
-        }
+class ListGraph : public IGraph {
+public:
+    ListGraph(int);
+    ListGraph(const IGraph*);
+    void AddEdge(int, int);
+    int VerticesCount() const;
+    void GetNextVertices(int, vector<int>&) const;
+    void GetPrevVertices(int, vector<int>&) const;
+private:
+    vector<vector<int>> adjacencyList;
+};
+
+ListGraph::ListGraph(int vertexCount) : adjacencyList(vertexCount) {}
+
+ListGraph::ListGraph(const IGraph* graph) : ListGraph(graph->VerticesCount())
+{
+    for (int i = 0; i < graph->VerticesCount(); ++i) {
+        vector <int> next;
+        graph->GetNextVertices(i, next);
+        adjacencyList.push_back(next);
     }
-    leave.push_back(v);
 }
 
-void DFSReverse(int v, Graph& graph, vector<int>& component) {
-    graph.visited_reverse[v] = true;
-    component.push_back(v);
-    for (size_t i = 0; i < graph.reversed_list[v].size(); ++i) {
-        if (!graph.visited_reverse[graph.reversed_list[v][i]]) {
-            DFSReverse(graph.reversed_list[v][i], graph, component);
-        }
-    }
-
+void ListGraph::AddEdge(int from, int to) {
+    adjacencyList[from].push_back(to);
 }
 
-// Используем алгоритм Косарайю поиска сильносвязных компонент. Во вспомогательный вектор component
-// в DFSReverse записали все вершины, входящие в ту же компоненту, в которую входит вершина i.
-// В leave храним последовательность посещенных DFS'ом вершин.
-// В vertex_in_component под номером вершины храним номер компоненты, которой эта вершина принадлежит.
-int CountComponents(Graph& graph) {
-    vector<int> leave;
-    for (int i = 0; i < graph.vertexNumber; ++i) {
-        if (!graph.visited[i]) {
-            DFS(i, graph, leave);
-        }
-    }
-    int count = 0;
-    for (int i = 0; i < graph.vertexNumber; ++i) {
-        int v = leave[graph.vertexNumber - 1 - i];
-        vector<int> component;
-        if (!graph.visited_reverse[v]) {
-            DFSReverse(v, graph, component);
-            for (int t : component) {
-                graph.vertex_in_component[t] = count;
-            }
-            component.clear();
-            ++count;
-        }
-    }
-    return count;
+int ListGraph::VerticesCount() const {
+    return adjacencyList.size();
 }
 
-// stok[i] = true, если из i-ой компоненты не выходит ни одно ребро в другую, иначе stok[i] = false.
-// istok[i] = true, если в i-ую компоненту не входит ни одно ребро из другой компоненты, иначе false.
-// Подсчитываем кол-во "стоковых" и "истоковых" компонент. Минимальное кол-во рёбер, которые нужно
-// добавить, чтобы граф стал сильносвязным, ровно столько, сколько нужно добавить, чтобы stok и istok
-// содержали только false'ы. Т.е. чтобы из любой компоненты можно было попасть в другие и наоборот.
-int MinAmountOfEdges(Graph& graph, int countComponent) {
-    vector<bool> stok(countComponent, true);
-    vector<bool> istok(countComponent, true);
-    for (int i = 0; i < graph.vertexNumber; ++i) {
-        for (int t : graph.list[i]) {
-            if (graph.vertex_in_component[i] != graph.vertex_in_component[t]) {
-                stok[graph.vertex_in_component[i]] = false;
-                break;
-            }
-        }
-        for (int t : graph.reversed_list[i]) {
-            if (graph.vertex_in_component[i] != graph.vertex_in_component[t]) {
-                istok[graph.vertex_in_component[i]] = false;
-                break;
+void ListGraph::GetNextVertices(int vertex, vector<int>& vertices) const {
+    vertices.clear();
+    vertices = adjacencyList[vertex];
+}
+
+void ListGraph::GetPrevVertices(int vertex, vector<int>& vertices) const {
+    vertices.clear();
+    for (int i = 0; i < adjacencyList.size(); ++i) {
+        for (int second : adjacencyList[i]) {
+            if (second == vertex) {
+                vertices.push_back(i);
             }
         }
     }
-    int s = 0;
-    int is = 0;
-    for (int i = 0; i < countComponent; ++i) {
-        if (stok[i] == true) {
-            ++s;
+}
+
+// Пусть стартовая вершина помечена цифрой 1. Помечаем соседние вершины цифрой 0. 
+// Их соседние - цифрой 1 и т.д. Если вершина уже помечена цифрой а, и цифра, которой мы 
+// хотим пометить эту вершину, не равна а, то граф недвудольный. Если поиском в ширину
+// посетили все вершины и несоответвий не встретилось, граф двудольный.
+bool BFS(IGraph* graph, int start) {
+    queue<int> tops;
+    vector<int> color(graph->VerticesCount());
+    vector<int> set(graph->VerticesCount());
+    color[start] = 1;
+    set[start] = 1;
+    tops.push(start);
+    while ((!tops.empty())) {
+        int vertex = tops.front();
+        tops.pop();
+        vector<int> next_vertices;
+        graph->GetNextVertices(vertex, next_vertices);
+        for (int i = 0; i < next_vertices.size(); ++i) {
+            if (set[next_vertices[i]] == set[vertex]) {
+                return false;
+            }
+            set[next_vertices[i]] = set[vertex] % 2 + 1;
+            if (color[next_vertices[i]] == 0) {
+                tops.push(next_vertices[i]);
+                color[next_vertices[i]] = 1;
+            }
         }
-        if (istok[i] == true) {
-            ++is;
-        }
+        color[vertex] = 2;
     }
-    return max(s, is);
+    return true;
 }
 
 int main() {
-    int v;
-    cin >> v;
-    int n;
-    cin >> n;
-    Graph graph(v);
-    for (int i = 0; i < n; ++i) {
-        int a = 0;
-        int b = 0;
-        cin >> a >> b;
-        graph.list[a - 1].push_back(b - 1);
-        graph.reversed_list[b - 1].push_back(a - 1);
+    int N, M;
+    cin >> N >> M;
+    ListGraph graph(N);
+    int from, to;
+    for (int i = 0; i < M; ++i) {
+        cin >> from >> to;
+        graph.AddEdge(from, to);
+        graph.AddEdge(to, from);
     }
-    int countComponent = CountComponents(graph);
-    if (countComponent == 1) {
-        cout << 0;
-    }
-    else {
-        cout << MinAmountOfEdges(graph, countComponent);
+    if (BFS(&graph, 0)) {
+        cout << "YES";
+    } else {
+        cout << "NO";
     }
     return 0;
 }
