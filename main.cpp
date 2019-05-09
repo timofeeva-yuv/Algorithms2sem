@@ -10,7 +10,7 @@ struct IGraph {
     virtual ~IGraph() {}
     virtual void AddEdge(int from, int to) = 0;
     virtual int VerticesCount() const = 0;
-    virtual void GetNextVertices(int vertex, std::vector<int>& vertices) const = 0;
+    virtual void GetNextVertices(int vertex, vector<int>& vertices) const = 0;
 };
 
 class ListGraph : public IGraph {
@@ -19,6 +19,7 @@ public:
     void AddEdge(int, int);
     int VerticesCount() const;
     void GetNextVertices(int, vector<int>&) const;
+    void GetPrevVertices(int, vector<int>&) const;
 private:
     vector<vector<int>> adjacencyList;
 };
@@ -38,42 +39,38 @@ void ListGraph::GetNextVertices(int vertex, vector<int>& vertices) const {
     vertices = adjacencyList[vertex];
 }
 
-int BFS(IGraph* graph, int start, int end) {
+int BFS(IGraph* graph, int start) {
     queue<int> tops;
-    vector<int> way(graph->VerticesCount());
+    vector<int> cycle(graph->VerticesCount());
     vector<int> color(graph->VerticesCount());
-    vector<int> count(graph->VerticesCount());
-    // way[i] - кол-во ребер (путь) между стартовой вершиной и i
-    way[start] = 0;
+    int length_cycle = 1000;
+    cycle[start] = 0;
     color[start] = 1;
-    // count[i] - количество различных кратчайших путей между start и i
-    count[start] = 1;
     tops.push(start);
-    while (!tops.empty()) {
+    // Если нашли какой-нибудь цикл, он и есть искомый, т.к. используем обход в ширину 
+    // (первый цикл = минимальный)
+    while ((!tops.empty()) && (length_cycle == 1000)) {
         int vertex = tops.front();
         tops.pop();
         vector<int> next_vertices;
         graph->GetNextVertices(vertex, next_vertices);
         for (int i = 0; i < next_vertices.size(); ++i) {
-            // В очередь добавляем непосещенные вершины (белые), изменяет цвет
             if (color[next_vertices[i]] == 0) {
                 tops.push(next_vertices[i]);
-                way[next_vertices[i]] = way[vertex] + 1;
+                cycle[next_vertices[i]] = cycle[vertex] + 1;
                 color[next_vertices[i]] = 1;
-                count[next_vertices[i]] = count[vertex];
             }
-            // Если соседняя вершина серая (т.е. мин. расстояние до нее от стартовой уже известно) и
-            // если расстояние от стартовой до нее равно расстоянию через текущую вершину vertex,
-            // то существует еще один кратчайший путь     
-            else if (color[next_vertices[i]] == 1) { 
-                if (way[next_vertices[i]] == way[vertex] + 1) { 
-                    count[next_vertices[i]] += count[vertex]; 
-                }
+            else if (color[next_vertices[i]] == 1) {
+                length_cycle = cycle[vertex] + cycle[next_vertices[i]] + 1;
+            }
+            // Если петля
+            else if (color[next_vertices[i]] == 2 && next_vertices[i] == vertex) {
+                length_cycle = 1;
             }
         }
         color[vertex] = 2;
     }
-    return count[end];
+    return length_cycle;
 }
 
 int main() {
@@ -86,8 +83,16 @@ int main() {
         graph.AddEdge(from, to);
         graph.AddEdge(to, from);
     }
-    int start, end;
-    cin >> start >> end;
-    cout << BFS(&graph, start, end);
+    int length_cycle = 1000;
+    for (int i = 0; i < N; ++i) {
+        int length = BFS(&graph, i);
+        if (length < length_cycle) {
+            length_cycle = length;
+        }
+    }
+    if (length_cycle == 1000) {
+        length_cycle = -1;
+    }
+    cout << length_cycle;
     return 0;
 }
