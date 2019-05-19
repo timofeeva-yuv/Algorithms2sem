@@ -3,38 +3,44 @@
 #include <algorithm>
 #include <utility>
 #include <queue>
-using std::vector;
+#include <limits>
+using std::cout;
 using std::cin;
+using std::endl;
 using std::pair;
 using std::make_pair;
+using std::vector;
+using std::numeric_limits;
+using std::max;
 
 class Edge {
 public:
-    pair<size_t, size_t> getEdge () const {
-        return make_pair(from, to);
+    size_t getFrom () const {
+        return from;
     }
-    size_t getCapacity () const {
+    size_t getTo () const {
+        return to;
+    }
+    size_t getCapacity() const {
         return capacity;
     }
     void setCapacity (size_t capacity) {
         this->capacity = capacity;
     }
-    long long getFlow () const {
-        return flow;
-    }
     void setFlow (long long flow) {
         this->flow = flow;
     }
-    long long getResidualCapacity () const {
+    //Остаточная пропускная способность
+    long long getResidualCapacity() const {
         return static_cast<long long>(capacity) - flow;
     }
-    Edge(size_t from, size_t to, size_t capacity) :
-            from(from),
-            to(to),
-            capacity(capacity),
-            flow(static_cast<long long>(0)) {}
+    void increaseFlow(long long increment) {
+        flow += increment;
+    }
+    Edge(size_t from, size_t to, size_t capacity) : from(from), to(to), capacity(capacity), flow(0) {}
 private:
     size_t from, to;
+    // Пропускная способность
     size_t capacity;
     long long flow;
 };
@@ -42,30 +48,19 @@ private:
 class Net {
 public:
     typedef pair<Edge*, Edge*> Arc;
-    Net(size_t verticesCount, size_t source, size_t sink) :
-            verticesCount(verticesCount),
-            source(source),
-            sink(sink) {
-        edges.resize(verticesCount);
-    }
-    void addEdge(const Edge& edge) {
-        Edge* straightEdge = new Edge(edge.getEdge().first, edge.getEdge().second, edge.getCapacity());
-        Edge* reverseEdge = new Edge(edge.getEdge().second, edge.getEdge().first, 0);
-        Arc straightArc = make_pair(straightEdge, reverseEdge);
-        Arc reverseArc = make_pair(reverseEdge, straightEdge);
-        edges[edge.getEdge().first].push_back(straightArc);
-        edges[edge.getEdge().second].push_back(reverseArc);
-    }
+    Net(size_t, size_t, size_t);
+    ~Net();
+    void addEdge(const Edge&);
     const vector<Arc>& getOuterEdges(size_t from) const {
         return edges[from];
     }
-    size_t getVerticesCount() const {
+    size_t getVerticesCount () const {
         return verticesCount;
     }
-    size_t getSource() const {
+    size_t getSource () const {
         return source;
     }
-    size_t getSink() const {
+    size_t getSink () const {
         return sink;
     }
 private:
@@ -75,22 +70,48 @@ private:
     vector<vector<Arc>> edges;
 };
 
-long long DFS(const Net& net, const vector<size_t>& layers, size_t vertex, vector<size_t>& edgeIterators,
-              long long pushingFlow = std::numeric_limits<long long>::max()) {
+Net::Net(size_t verticesCount, size_t source, size_t sink) {
+    this->verticesCount = verticesCount;
+    this->source = source;
+    this->sink = sink;
+    edges.resize(verticesCount);
+}
+
+Net::~Net() {
+    for (const vector<Arc> &arcs: edges) {
+        for (const Arc &arc: arcs) {
+            delete arc.first;
+        }
+    }
+}
+
+void Net::addEdge(const Edge& edge) {
+    Edge* straightEdge = new Edge(edge.getFrom(), edge.getTo(), edge.getCapacity());
+    // Обратное ребро с нулевым потоком
+    Edge* reverseEdge = new Edge(edge.getTo(), edge.getFrom(), 0);
+    Arc straightArc = make_pair(straightEdge, reverseEdge);
+    Arc reverseArc = make_pair(reverseEdge, straightEdge);
+    edges[edge.getFrom()].push_back(straightArc);
+    edges[edge.getTo()].push_back(reverseArc);
+}
+
+// Поиск блокирующего потока
+long long tryPushFlowToTheSink(const Net& net, const vector<size_t>& layers, size_t vertex, vector<size_t>& edgeIterators,
+                               long long pushingFlow = std::numeric_limits<long long>::max()) {
     if (vertex == net.getSink() || pushingFlow == 0) {
         return pushingFlow;
     }
-    const vector<Net::Arc>& arcs = net.getOuterEdges(vertex);
+    const vector<Net::Arc>& arcs = net.getOuterEdges(vertex); //////////////////////
     for (size_t i = edgeIterators[vertex]; i < arcs.size(); ++i) {
         const Edge edge = *arcs[i].first;
-        if (layers[edge.getEdge().first] + 1 != layers[edge.getEdge().second] || edge.getResidualCapacity() <= 0) {
+        if (layers[edge.getFrom()] + 1 != layers[edge.getTo()] || edge.getResidualCapacity() <= 0) {
             continue;
         }
         const long long newPushingFlow = std::min<long long>(pushingFlow, edge.getResidualCapacity());
-        const long long pushedFlow = DFS(net, layers, edge.getEdge().second, edgeIterators, newPushingFlow);
+        const long long pushedFlow = tryPushFlowToTheSink(net, layers, edge.getTo(), edgeIterators, newPushingFlow);
         if (pushedFlow != 0) {
-            arcs[i].first->setFlow(arcs[i].first->getFlow() + pushedFlow);
-            arcs[i].second->setFlow(arcs[i].second->getFlow() - pushedFlow);
+            arcs[i].first->increaseFlow(pushedFlow);
+            arcs[i].second->increaseFlow(-pushedFlow);
             return pushedFlow;
         }
     }
@@ -100,8 +121,10 @@ long long DFS(const Net& net, const vector<size_t>& layers, size_t vertex, vecto
     return 0;
 }
 
+// Слоистая сеть
 vector<size_t> buildLayeredNetwork (const Net& net) {
     std::queue<size_t> que;
+    // Заполняем максимальными значениями
     vector<size_t> layers(net.getVerticesCount(), static_cast<size_t>(-1));
     layers[net.getSource()] = 0;
     vector<bool> used(net.getVerticesCount(), false);
@@ -109,16 +132,14 @@ vector<size_t> buildLayeredNetwork (const Net& net) {
     while (!que.empty()) {
         const size_t vertex = que.front();
         que.pop();
-        if (used[vertex]) {
-            continue;
-        }
+        if (used[vertex]) {}
         else {
             for (const Net::Arc& arc: net.getOuterEdges(vertex)) {
                 if (arc.first->getResidualCapacity() <= 0) {
                     continue;
                 }
-                const size_t nextVertex = arc.first->getEdge().second;
-                if (layers[nextVertex] == static_cast<size_t>(-1)) {
+                const size_t nextVertex = arc.first->getTo();
+                if (layers[nextVertex] == numeric_limits<size_t>::max()) {
                     layers[nextVertex] = layers[vertex] + 1;
                     que.push(nextVertex);
                 }
@@ -129,7 +150,7 @@ vector<size_t> buildLayeredNetwork (const Net& net) {
     return layers;
 }
 
-long long setMaxFlow (const Net& net) {
+long long SetMaxFlow (const Net& net) {
     long long maxFlow = 0;
     while (true) {
         vector<size_t> layers = buildLayeredNetwork(net);
@@ -139,7 +160,7 @@ long long setMaxFlow (const Net& net) {
         long long augmentation = 0;
         vector<size_t> edgeIterators(net.getVerticesCount(), 0);
         do {
-            augmentation = DFS(net, layers, net.getSource(), edgeIterators);
+            augmentation = tryPushFlowToTheSink(net, layers, net.getSource(), edgeIterators);
             maxFlow += augmentation;
         }
         while (augmentation > 0);
@@ -148,22 +169,24 @@ long long setMaxFlow (const Net& net) {
 }
 
 void clearFlow (Net& net) {
-    for (size_t i = 0; i < net.getVerticesCount(); ++i) {
-        for (const Net::Arc& arc: net.getOuterEdges(i)) {
+    for (size_t i = 0; i < net.getVerticesCount(); i ++) {
+        for (const typename Net::Arc& arc: net.getOuterEdges(i)) {
             arc.first->setFlow(0);
         }
     }
 }
 
-bool canDrink (Net& net, size_t employeesCount, size_t days) {
-    for (const Net::Arc& arc: net.getOuterEdges(net.getSource())) {
+bool canDrink (Net& net, const size_t& employeesCount, const size_t& days) {
+    for (const typename Net::Arc& arc: net.getOuterEdges(net.getSource())) {
         arc.first->setCapacity(days);
     }
-    long long maxFlow = setMaxFlow(net);
+    const long long maxFlow = SetMaxFlow(net);
     bool out = (maxFlow == employeesCount * days);
     clearFlow(net);
     return out;
 }
+
+
 
 int main() {
     size_t employeesCount, teaTypesCount;
@@ -173,7 +196,7 @@ int main() {
     const size_t sink = verticesCount - 1;
     Net net(verticesCount, source, sink);
     for (size_t i = 0; i < employeesCount; ++i) {
-        const size_t capacity = 100000000000;
+        const size_t capacity = numeric_limits<uint32_t>::max();
         Edge edge(source, 1 + i, capacity);
         net.addEdge(edge);
     }
@@ -183,7 +206,8 @@ int main() {
         Edge edge(1 + employeesCount + i, sink, capacity);
         net.addEdge(edge);
     }
-
+    // Стоим сеть из 4х слоев: в 1м - мнимая вершина-источник, во 2м - сотрудники, в 3м - сорта чая,
+    // в 4м - мнимая вершина-сток
     for (size_t i = 0; i < employeesCount; ++i) {
         size_t favouriteTeaTypesCount;
         cin >> favouriteTeaTypesCount;
@@ -191,17 +215,24 @@ int main() {
             size_t favouriteTeaTypeId;
             cin >> favouriteTeaTypeId;
             --favouriteTeaTypeId;
-            const size_t capacity = 100000000000;
+            const size_t capacity = numeric_limits<uint32_t>::max();
             Edge edge(1 + i, 1 + employeesCount + favouriteTeaTypeId, capacity);
             net.addEdge(edge);
         }
     }
     size_t left = 0;
-    size_t right = 100000000000;
+    size_t right = numeric_limits<uint32_t>::max();
+    // Бинарным поиском ищем максимальное кол-во дней
+    // На каждой итераии бин. поиска перестаиваем сеть и запускаем метод canDrink, 
+    // чтобы узнать хватит ли чая на middle дней. Бин. поиском по ответу находим верхнюю границу.
     while (right - left > 1) {
         const size_t middle = (left + right) / 2;
-        (canDrink(net, employeesCount, middle) ? left : right) = middle;
+        if (canDrink(net, employeesCount, middle)) {
+            left = middle;
+        } else {
+            right = middle;
+        }
     }
-    std::cout << left << std::endl;
+    cout << left << endl;
     return 0;
 }
