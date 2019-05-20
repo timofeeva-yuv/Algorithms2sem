@@ -26,11 +26,11 @@ class SegmentTree {
 private:
     int size;
     vector<Node> tree;
-    Node createNode (const Node &, const Node &);
+    Node createNode(const Node&, const Node&);
 
 public:
-    SegmentTree (const vector<int> &);
-    Node maxSubsegment (const int &, const int &, const int &, const int &, const int &);
+    SegmentTree (const vector<int>&);
+    Node maxSubsegment (int, int, int, int, int);
 };
 
 Node SegmentTree::createNode (const Node& left, const Node& right) {
@@ -59,7 +59,7 @@ SegmentTree::SegmentTree (const vector<int> &sequence) {
     }
 }
 
-Node SegmentTree::maxSubsegment (const int &node, const int &left, const int &right, const int &queryLeft, const int &queryRight) {
+Node SegmentTree::maxSubsegment (int node, int left, int right, int queryLeft, int queryRight) {
     const int rightChildIndex = 2 * node + 2;
     const int leftChildIndex = 2 * node + 1;
     const int middle = (queryLeft + queryRight) / 2;
